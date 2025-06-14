@@ -126,204 +126,172 @@
             }
         });
 
-        function createImage(src, posX = 50, posY = 50, width = 100, height = 100, rotation = 0) {
-            const container = document.createElement('div');
-            container.className = 'image-container';
-            container.style.width = width + 'px';
-            container.style.height = height + 'px';
+function createImage(src, posX = 50, posY = 50, width = 100, height = 100, rotation = 0) {
+    // 컨테이너 요소 생성 (DB: custom_images 테이블 레코드에 해당)
+    const container = document.createElement('div');
+    container.className = 'image-container';
+    container.style.width = `${width}px`;  // DB: width 컬럼
+    container.style.height = `${height}px`; // DB: height 컬럼
 
-            let rotationAngle = rotation;
-            let currentX = posX;
-            let currentY = posY;
+    // 상태 변수 초기화
+    let rotationAngle = rotation; // DB: rotation 컬럼 (0~360)
+    let currentX = posX;          // DB: pos_x (픽셀 → 비율 변환 필요)
+    let currentY = posY;          // DB: pos_y (픽셀 → 비율 변환 필요)
 
-            const img = document.createElement('img');
-            img.src = src;
-            img.className = 'uploaded-image';
-            container.appendChild(img);
+    // 이미지 요소 생성 및 속성 설정
+    const img = document.createElement('img');
+    img.src = src;                // DB: image_url 컬럼
+    img.className = 'uploaded-image';
+    container.appendChild(img);
 
-            const deleteButton = document.createElement('button');
-            deleteButton.className = 'delete-button hidden';
-            deleteButton.textContent = 'Delete';
-            container.appendChild(deleteButton);
+    // 삭제 버튼 설정 (DB 연동 필요 없음)
+    const deleteButton = document.createElement('button');
+    deleteButton.className = 'delete-button hidden';
+    deleteButton.textContent = 'Delete';
+    container.appendChild(deleteButton);
 
-            const copyButton = document.createElement('button');
-            copyButton.className = 'copy-button hidden';
-            copyButton.textContent = 'Copy';
-            container.appendChild(copyButton);
+    // 복사 버튼 설정 (DB: design_id 관리 필요)
+    const copyButton = document.createElement('button');
+    copyButton.className = 'copy-button hidden';
+    copyButton.textContent = 'Copy';
+    container.appendChild(copyButton);
 
-            const rotateHandle = document.createElement('div');
-            rotateHandle.className = 'rotate-handle hidden';
-            container.appendChild(rotateHandle);
+    // 회전 핸들 생성 (DB: rotation 컬럼 업데이트)
+    const rotateHandle = document.createElement('div');
+    rotateHandle.className = 'rotate-handle hidden';
+    container.appendChild(rotateHandle);
 
-            ['tl', 'tr', 'bl', 'br'].forEach(handle => {
-                const resizeHandle = document.createElement('div');
-                resizeHandle.className = `resize-handle ${handle} hidden`;
-                container.appendChild(resizeHandle);
+    // 리사이즈 핸들 생성 (4방향)
+    ['tl', 'tr', 'bl', 'br'].forEach(handle => {
+        const resizeHandle = document.createElement('div');
+        resizeHandle.className = `resize-handle ${handle} hidden`;
+        container.appendChild(resizeHandle);
 
-                resizeHandle.addEventListener('mousedown', function(ev) {
-                    ev.preventDefault();
-                    ev.stopPropagation();
-                    const rect = container.getBoundingClientRect();
-                    const caseRect = caseElement.getBoundingClientRect();
-                    const initWidth = rect.width;
-                    const initHeight = rect.height;
-                    const initX = ev.clientX;
-                    const initY = ev.clientY;
+        // 리사이즈 이벤트 핸들러 (DB: width/height/pos_x/pos_y 업데이트)
+        resizeHandle.addEventListener('mousedown', function(ev) {
+            ev.preventDefault();
+            ev.stopPropagation();
+            
+            // 초기 위치 정보 저장
+            const rect = container.getBoundingClientRect();
+            const caseRect = caseElement.getBoundingClientRect();
+            const initWidth = rect.width;     // DB: width
+            const initHeight = rect.height;   // DB: height
+            
+            // 마우스 이동 처리
+            function onMouseMove(e) {
+                const deltaX = e.clientX - ev.clientX;
+                const deltaY = e.clientY - ev.clientY;
 
-                    const originX = handle.includes('l') ? rect.right : rect.left;
-                    const originY = handle.includes('t') ? rect.bottom : rect.top;
-                    const offsetX = originX - rect.left;
-                    const offsetY = originY - rect.top;
+                // 리사이즈 계산 로직
+                let newWidth = initWidth + deltaX * (handle.includes('r') ? 1 : -1);
+                let newHeight = initHeight + deltaY * (handle.includes('b') ? 1 : -1);
 
-                    function onMouseMove(e) {
-                        const deltaX = e.clientX - initX;
-                        const deltaY = e.clientY - initY;
-
-                        let scaleX = handle.includes('l') ? -1 : 1;
-                        let scaleY = handle.includes('t') ? -1 : 1;
-
-                        let newWidth = initWidth + deltaX * scaleX;
-                        let newHeight = initHeight + deltaY * scaleY;
-
-                        // Shift 누르면 비율 유지
-                        if (e.shiftKey) {
-                            const aspectRatio = initWidth / initHeight;
-                            if (Math.abs(deltaX) > Math.abs(deltaY)) {
-                                newWidth = initWidth + deltaX * scaleX;
-                                newHeight = newWidth / aspectRatio;
-                            } else {
-                                newHeight = initHeight + deltaY * scaleY;
-                                newWidth = newHeight * aspectRatio;
-                            }
-                        }
-
-                        newWidth = Math.max(30, newWidth);
-                        newHeight = Math.max(30, newHeight);
-
-                        // 이동 보정 (기준점 유지)
-                        const offsetX = (handle.includes('l') ? 1 : 0);
-                        const offsetY = (handle.includes('t') ? 1 : 0);
-
-                        const newLeft = originX - newWidth * offsetX;
-                        const newTop = originY - newHeight * offsetY;
-                        currentX = newLeft - caseRect.left;
-                        currentY = newTop - caseRect.top;
-
-                        container.style.width = `${newWidth}px`;
-                        container.style.height = `${newHeight}px`;
-                        container.style.transform = `translate(${currentX}px, ${currentY}px) rotate(${rotationAngle}deg)`;
-                    }
-
-
-
-                    function onMouseUp() {
-                        document.removeEventListener('mousemove', onMouseMove);
-                        document.removeEventListener('mouseup', onMouseUp);
-                    }
-
-                    document.addEventListener('mousemove', onMouseMove);
-                    document.addEventListener('mouseup', onMouseUp);
-                });
-            });
-
-            container.addEventListener('click', function(ev) {
-                ev.stopPropagation();
-                document.querySelectorAll('.image-container').forEach(c => {
-                    c.classList.remove('selected');
-                    c.querySelectorAll('.resize-handle').forEach(h => h.classList.add('hidden'));
-                    c.querySelector('.delete-button').classList.add('hidden');
-                    c.querySelector('.copy-button').classList.add('hidden');
-                    c.querySelector('.rotate-handle').classList.add('hidden');
-                });
-                container.classList.add('selected');
-                container.querySelectorAll('.resize-handle').forEach(h => h.classList.remove('hidden'));
-                deleteButton.classList.remove('hidden');
-                copyButton.classList.remove('hidden');
-                rotateHandle.classList.remove('hidden');
-            });
-
-            deleteButton.addEventListener('click', () => {
-                caseElement.removeChild(container);
-            });
-
-            copyButton.addEventListener('click', () => {
-                createImage(
-                    src,
-                    currentX + 20,
-                    currentY + 20,
-                    container.offsetWidth,
-                    container.offsetHeight,
-                    rotationAngle
-                );
-            });
-
-            rotateHandle.addEventListener('mousedown', function(ev) {
-                ev.preventDefault();
-                const rect = container.getBoundingClientRect();
-                const centerX = rect.left + rect.width / 2;
-                const centerY = rect.top + rect.height / 2;
-                let startAngle = Math.atan2(ev.clientY - centerY, ev.clientX - centerX);
-
-                function onMouseMove(e) {
-                    const currentAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX);
-                    const angleDelta = currentAngle - startAngle;
-                    rotationAngle += angleDelta * (180 / Math.PI);
-                    container.style.transform = `translate(${currentX}px, ${currentY}px) rotate(${rotationAngle}deg)`;
-                    startAngle = currentAngle;
+                // Shift 키: 종횡비 유지 (DB: scale_x/scale_y 자동 계산)
+                if (e.shiftKey) {
+                    const aspectRatio = initWidth / initHeight;
+                    newHeight = newWidth / aspectRatio;
                 }
 
-                function onMouseUp() {
-                    document.removeEventListener('mousemove', onMouseMove);
-                    document.removeEventListener('mouseup', onMouseUp);
-                }
+                // 최소 크기 제한
+                newWidth = Math.max(30, newWidth);
+                newHeight = Math.max(30, newHeight);
 
-                document.addEventListener('mousemove', onMouseMove);
-                document.addEventListener('mouseup', onMouseUp);
-            });
+                // 위치 재계산 (DB: pos_x/pos_y)
+                currentX = rect.left - caseRect.left + (handle.includes('l') ? initWidth - newWidth : 0);
+                currentY = rect.top - caseRect.top + (handle.includes('t') ? initHeight - newHeight : 0);
 
-            container.addEventListener('mousedown', function(ev) {
-                if (
-                    ev.target.classList.contains('resize-handle') ||
-                    ev.target.classList.contains('rotate-handle')
-                ) return;
+                // UI 업데이트
+                container.style.width = `${newWidth}px`;
+                container.style.height = `${newHeight}px`;
+                container.style.transform = `translate(${currentX}px, ${currentY}px) rotate(${rotationAngle}deg)`;
+            }
 
-                if (!container.classList.contains('selected')) return;
+            // 이벤트 리스너 정리
+            function onMouseUp() {
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+                saveToDatabase(); // DB 저장 함수 호출
+            }
 
-                const rect = container.getBoundingClientRect();
-                const clickX = ev.clientX - rect.left;
-                const clickY = ev.clientY - rect.top;
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        });
+    });
 
-                function onMouseMove(e) {
-                    const rect = caseElement.getBoundingClientRect();
-                    currentX = e.clientX - rect.left - clickX;
-                    currentY = e.clientY - rect.top - clickY;
-                    container.style.transform = `translate(${currentX}px, ${currentY}px) rotate(${rotationAngle}deg)`;
-                }
+    // 회전 이벤트 핸들러 (DB: rotation 컬럼 업데이트)
+    rotateHandle.addEventListener('mousedown', function(ev) {
+        ev.preventDefault();
+        const centerX = container.offsetLeft + container.offsetWidth/2;
+        const centerY = container.offsetTop + container.offsetHeight/2;
+        let startAngle = Math.atan2(ev.clientY - centerY, ev.clientX - centerX);
 
-                function onMouseUp() {
-                    document.removeEventListener('mousemove', onMouseMove);
-                    document.removeEventListener('mouseup', onMouseUp);
-                }
-
-                document.addEventListener('mousemove', onMouseMove);
-                document.addEventListener('mouseup', onMouseUp);
-            });
-
-            container.addEventListener('dragstart', e => e.preventDefault());
-
+        function onMouseMove(e) {
+            const currentAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX);
+            rotationAngle += (currentAngle - startAngle) * (180 / Math.PI);
             container.style.transform = `translate(${currentX}px, ${currentY}px) rotate(${rotationAngle}deg)`;
-            caseElement.appendChild(container);
+            startAngle = currentAngle;
         }
 
-        document.addEventListener('click', function() {
-            document.querySelectorAll('.image-container').forEach(c => {
-                c.classList.remove('selected');
-                c.querySelectorAll('.resize-handle').forEach(h => h.classList.add('hidden'));
-                c.querySelector('.delete-button').classList.add('hidden');
-                c.querySelector('.copy-button').classList.add('hidden');
-                c.querySelector('.rotate-handle').classList.add('hidden');
-            });
+        function onMouseUp() {
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+            saveToDatabase(); // DB 저장 함수 호출
+        }
+
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+    });
+
+    // 이동 이벤트 핸들러 (DB: pos_x/pos_y 업데이트)
+    container.addEventListener('mousedown', function(ev) {
+        if (ev.target.closest('.resize-handle, .rotate-handle')) return;
+
+        const startX = ev.clientX - currentX;
+        const startY = ev.clientY - currentY;
+
+        function onMouseMove(e) {
+            currentX = e.clientX - startX;
+            currentY = e.clientY - startY;
+            container.style.transform = `translate(${currentX}px, ${currentY}px) rotate(${rotationAngle}deg)`;
+        }
+
+        function onMouseUp() {
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+            saveToDatabase(); // DB 저장 함수 호출
+        }
+
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+    });
+
+    // DB 저장 함수
+    function saveToDatabase() {
+        const designData = {
+            image_url: src,
+            file_name: src.split('/').pop(),
+            pos_x: currentX / caseElement.offsetWidth,  // 픽셀 → 비율 변환
+            pos_y: currentY / caseElement.offsetHeight,
+            width: container.offsetWidth,
+            height: container.offsetHeight,
+            rotation: rotationAngle % 360,
+            original_width: img.naturalWidth,  // 원본 너비
+            original_height: img.naturalHeight // 원본 높이
+        };
+
+        // PHP API 호출
+        fetch('/api/save-design', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(designData)
         });
+    }
+
+    // 초기 위치 설정
+    container.style.transform = `translate(${currentX}px, ${currentY}px) rotate(${rotationAngle}deg)`;
+    caseElement.appendChild(container);
+}
     </script>
 </body>
 
